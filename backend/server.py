@@ -58,6 +58,9 @@ class Student(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     serial: str
     name: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
     emoji: str = "🧑"
     classe: str = "Non renseigné"
     filieres: List[str] = Field(default_factory=list)
@@ -71,6 +74,9 @@ class Student(BaseModel):
     class_code: Optional[str] = None
     is_demo: bool = False
     is_anonymous: bool = False  # Théo case
+    is_guest: bool = False
+    guest_claimed: bool = False
+    claimed_at: Optional[str] = None
     # Engagement signals (D2 / D3)
     scan_exposant: bool = False
     email_opened: bool = False
@@ -88,9 +94,18 @@ class StudentCreate(BaseModel):
     class_code: Optional[str] = None
 
 
+class GuestClaim(BaseModel):
+    first_name: str
+    last_name: str = ""
+    email: str
+
+
 class StudentUpdate(BaseModel):
     emoji: Optional[str] = None
     name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
     classe: Optional[str] = None
     filieres: Optional[List[str]] = None
     formation: Optional[List[str]] = None
@@ -777,6 +792,7 @@ async def list_students(include_demo: bool = False, limit: int = 50):
     query = {"is_anonymous": {"$ne": True}}
     if not include_demo:
         query["is_demo"] = {"$ne": True}
+    query["$or"] = [{"is_guest": {"$ne": True}}, {"guest_claimed": True}]
     students = (
         await db.students.find(query, {"_id": 0})
         .sort("created_at", -1)
@@ -807,6 +823,57 @@ async def create_student(body: StudentCreate):
     doc = student.model_dump()
     await db.students.insert_one(dict(doc))
     return clean_doc(doc)
+
+
+@api_router.post("/students/guest")
+async def create_guest_student():
+    serial = f"INV-2026-{secrets.randbelow(90000) + 10000}"
+    student = Student(
+        serial=serial,
+        name="Invité salon",
+        emoji="🎒",
+        classe="Groupe professeur",
+        filieres=[],
+        formation=[],
+        consents=Consents(l=False, d=False, c=False, e=False),
+        is_guest=True,
+        guest_claimed=False,
+    )
+    doc = student.model_dump()
+    await db.students.insert_one(dict(doc))
+    return clean_doc(doc)
+
+
+@api_router.post("/students/{student_id}/claim")
+async def claim_guest_student(student_id: str, body: GuestClaim):
+    current = await db.students.find_one({"id": student_id}, {"_id": 0})
+    if not current:
+        raise HTTPException(404, "Student not found")
+    if current.get("is_anonymous"):
+        raise HTTPException(403, "Profil anonyme non convertible")
+
+    first_name = body.first_name.strip()
+    last_name = body.last_name.strip()
+    email = body.email.strip().lower()
+    if not first_name:
+        raise HTTPException(400, "Prénom requis")
+    if "@" not in email or "." not in email:
+        raise HTTPException(400, "Email invalide")
+
+    update = {
+        "first_name": first_name,
+        "last_name": last_name,
+        "email": email,
+        "name": f"{first_name} {last_name}".strip(),
+        "is_guest": True,
+        "guest_claimed": True,
+        "claimed_at": now_iso(),
+        "email_opened": True,
+        "consents.l": True,
+        "consents.e": True,
+    }
+    await db.students.update_one({"id": student_id}, {"$set": update})
+    return await get_student(student_id)
 
 
 @api_router.get("/students/{student_id}")
@@ -1260,7 +1327,11 @@ async def leads(
     limit: int = 200,
 ):
     students = await db.students.find(
-        {"is_anonymous": {"$ne": True}}, {"_id": 0}
+        {
+            "is_anonymous": {"$ne": True},
+            "$or": [{"is_guest": {"$ne": True}}, {"guest_claimed": True}],
+        },
+        {"_id": 0},
     ).sort("created_at", -1).to_list(1000)
     rows = []
     for s in students:
@@ -1283,6 +1354,7 @@ async def leads(
         rows.append({
             "id": s["id"],
             "name": s["name"],
+            "email": s.get("email"),
             "serial": s["serial"],
             "classe": s["classe"],
             "filieres": s.get("filieres") or [],
@@ -1295,6 +1367,8 @@ async def leads(
             "temperature": lead_temperature(score),
             "lead_value_eur": lead_value_eur(score),
             "is_demo": s.get("is_demo", False),
+            "is_guest": s.get("is_guest", False),
+            "guest_claimed": s.get("guest_claimed", False),
         })
     rows.sort(key=lambda r: (-r["score"], -r["stamp_count"]))
     return rows[:limit]

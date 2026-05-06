@@ -16,6 +16,10 @@ export const getSchool = (id) => api.get(`/schools/${id}`).then((r) => r.data);
 
 export const createStudent = (payload) =>
   api.post("/students", payload).then((r) => r.data);
+export const createGuestStudent = () =>
+  api.post("/students/guest").then((r) => r.data);
+export const claimGuestStudent = (id, payload) =>
+  api.post(`/students/${id}/claim`, payload).then((r) => r.data);
 export const listStudents = (includeDemo = false) =>
   api.get(`/students?include_demo=${includeDemo}`).then((r) => r.data);
 export const getStudent = (id) =>

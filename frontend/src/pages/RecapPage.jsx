@@ -5,16 +5,18 @@ import { usePassport } from "@/context/PassportContext";
 import BottomNav from "@/components/BottomNav";
 import Toast from "@/components/Toast";
 import { BackIcon } from "@/components/icons";
-import { getRecap, getLeaderboard } from "@/lib/api";
+import { getRecap, getLeaderboard, claimGuestStudent } from "@/lib/api";
 import { downloadBadge, shareBadge } from "@/lib/badge";
 
 export default function RecapPage() {
   const navigate = useNavigate();
-  const { student, loading } = usePassport();
+  const { student, setStudent, loading } = usePassport();
   const [recap, setRecap] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
   const [toast, setToast] = useState({ msg: "", type: "ok" });
   const [busy, setBusy] = useState(false);
+  const [claimForm, setClaimForm] = useState({ first_name: "", last_name: "", email: "" });
+  const [claiming, setClaiming] = useState(false);
 
   useEffect(() => {
     if (!student) return;
@@ -72,6 +74,23 @@ export default function RecapPage() {
   const myRank = myClassCode
     ? leaderboard.find((r) => r.code === myClassCode)?.rank
     : null;
+  const shouldShowGuestClaim = student.is_guest && !student.guest_claimed;
+
+  const onClaimGuest = async () => {
+    setClaiming(true);
+    try {
+      const updated = await claimGuestStudent(student.id, claimForm);
+      setStudent(updated);
+      setToast({ msg: "✓ Dashboard enregistré et prêt à être envoyé", type: "ok" });
+    } catch (e) {
+      setToast({
+        msg: e?.response?.data?.detail || "Impossible d'enregistrer tes coordonnées",
+        type: "err",
+      });
+    } finally {
+      setClaiming(false);
+    }
+  };
 
   return (
     <div className="pe-shell">
@@ -114,6 +133,57 @@ export default function RecapPage() {
           </div>
         </div>
         <div className="rscroll">
+          {shouldShowGuestClaim ? (
+            <div className="guest-claim-card" data-testid="guest-claim-card">
+              <div className="guest-claim-kicker">Mode invité</div>
+              <div className="guest-claim-title">Recevoir mon dashboard</div>
+              <div className="guest-claim-text">
+                Tu peux tester sans compte. Si ton récap t'intéresse, laisse tes coordonnées
+                pour recevoir tes visites et recommandations.
+              </div>
+              <div className="guest-claim-grid">
+                <input
+                  className="fi"
+                  value={claimForm.first_name}
+                  onChange={(e) => setClaimForm({ ...claimForm, first_name: e.target.value })}
+                  placeholder="Prénom"
+                  data-testid="guest-firstname"
+                />
+                <input
+                  className="fi"
+                  value={claimForm.last_name}
+                  onChange={(e) => setClaimForm({ ...claimForm, last_name: e.target.value })}
+                  placeholder="Nom"
+                  data-testid="guest-lastname"
+                />
+              </div>
+              <input
+                className="fi"
+                value={claimForm.email}
+                onChange={(e) => setClaimForm({ ...claimForm, email: e.target.value })}
+                placeholder="Adresse mail"
+                type="email"
+                data-testid="guest-email"
+              />
+              <button
+                className="sub-btn"
+                onClick={onClaimGuest}
+                disabled={claiming}
+                data-testid="btn-claim-guest"
+              >
+                {claiming ? "Envoi..." : "M'envoyer mon dashboard"}
+              </button>
+            </div>
+          ) : student.is_guest && student.guest_claimed ? (
+            <div className="guest-claim-card done">
+              <div className="guest-claim-kicker">Dashboard sauvegardé</div>
+              <div className="guest-claim-text">
+                Tes données de visite sont rattachées à {student.email}. L'équipe peut te
+                renvoyer ton récap après la démo.
+              </div>
+            </div>
+          ) : null}
+
           {isAnon ? (
             <>
               <div className="es">

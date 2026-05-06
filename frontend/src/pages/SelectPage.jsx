@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePassport } from "@/context/PassportContext";
 import { TeacherIcon, ChartIcon, ScanIcon } from "@/components/icons";
-import { getStudent, listStudents, deleteStudent } from "@/lib/api";
+import { getStudent, listStudents, deleteStudent, createGuestStudent } from "@/lib/api";
 
 const LOGO_URL = "https://birdeo.com/wp-content/uploads/2024/11/LOGo-letudiant.jpg";
 
@@ -13,6 +13,7 @@ export default function SelectPage() {
   const [loading, setLoading] = useState("");
   const [created, setCreated] = useState([]);
   const [refreshing, setRefreshing] = useState(true);
+  const [guestCreating, setGuestCreating] = useState(false);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -60,6 +61,19 @@ export default function SelectPage() {
       localStorage.clear();
     } catch {}
     refresh();
+  };
+
+  const startGuest = async () => {
+    setGuestCreating(true);
+    try {
+      const guest = await createGuestStudent();
+      selectStudent(guest.id);
+      navigate("/passport/stamps");
+    } catch {
+      alert("Impossible de lancer le mode invité.");
+    } finally {
+      setGuestCreating(false);
+    }
   };
 
   return (
@@ -121,6 +135,25 @@ export default function SelectPage() {
               <div className="cc-name">Activer mon PasseportEtudiant</div>
               <div className="cc-desc">
                 Crée ton profil en 60s avec le code professeur
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            className="create-card guest-card"
+            onClick={startGuest}
+            initial={{ y: 14, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.16, duration: 0.4 }}
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            data-testid="btn-start-guest"
+          >
+            <div className="cc-icon">◎</div>
+            <div>
+              <div className="cc-name">{guestCreating ? "Ouverture..." : "Essayer sans compte"}</div>
+              <div className="cc-desc">
+                Scanner les stands, voir son dashboard, laisser ses infos à la fin
               </div>
             </div>
           </motion.div>
