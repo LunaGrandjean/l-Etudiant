@@ -1806,6 +1806,21 @@ button {
   color: white;
   font-weight: 800;
 }
+.scanner-tools {
+  padding: 0 20px 14px;
+  display: flex;
+  justify-content: center;
+}
+.scanner-tool-btn {
+  background: white;
+  border: none;
+  color: #111827;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
 .scanner-demo {
   padding: 0 20px 20px;
 }

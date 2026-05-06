@@ -93,7 +93,14 @@ export default function DemoQrBoardPage() {
                 </div>
               </div>
               <div className="demoqr-code">
-                <QRCodeSVG value={scanUrl} size={250} level="H" fgColor="#1A237E" />
+                <QRCodeSVG
+                  value={scanUrl}
+                  size={280}
+                  level="H"
+                  fgColor="#000000"
+                  bgColor="#ffffff"
+                  marginSize={4}
+                />
               </div>
               <div className="demoqr-url">{scanUrl}</div>
               {stamp ? <div className="demoqr-time">Last scan: {stamp.time_label}</div> : null}
